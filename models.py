@@ -24,10 +24,24 @@ from torch_geometric.nn import GCNConv, GATConv, Linear, to_hetero
 #         self.conv4 = GCNConv((-1, -1), 1)
 
 #endregion
-
+class MLP(torch.nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super().__init__()
+        self.lin1 = Linear(input_size, hidden_size)
+        self.lin2 = Linear(hidden_size, hidden_size)
+        self.lin3 = Linear(hidden_size, output_size)
+    
+    def forward(self, x):
+        x = self.lin1(x)
+        x = x.relu()
+        x = self.lin2(x)
+        x = x.relu()
+        x = self.lin3(x)
+        x = x.sigmoid()
+        return x
 
 class GAT(torch.nn.Module):
-    def __init__(self, hidden_channels, out_channels):
+    def __init__(self, hidden_channels):
         super().__init__()
         self.lin0 = Linear(-1, hidden_channels, bias=False)
         self.conv1 = GATConv((-1, -1), hidden_channels, add_self_loops=False)
@@ -36,8 +50,8 @@ class GAT(torch.nn.Module):
         self.lin2 = Linear(-1, hidden_channels, bias=False)
         self.conv3 = GATConv((-1, -1), hidden_channels, add_self_loops=False)
         self.lin3 = Linear(-1, hidden_channels, bias=False)
-        self.conv4 = GATConv((-1, -1), out_channels, add_self_loops=False)
-        self.lin4 = Linear(-1, out_channels, bias=False)
+        self.conv4 = GATConv((-1, -1), hidden_channels, add_self_loops=False)
+        self.lin4 = Linear(-1, hidden_channels, bias=False)
 
     def forward(self, x, edge_index, edge_attr):
         x = self.lin0(x)
