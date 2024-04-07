@@ -3,6 +3,10 @@ import numpy as np
 from torch_geometric.data import HeteroData
 import torch_geometric.transforms as T
 from my_utils import formula_utils as F
+import matplotlib.pyplot as plt
+import networkx as nx
+from torch_geometric.utils import to_networkx
+from copy import deepcopy
 
 def convert_instance_to_VCG_with_meta_node(formula):
     """
@@ -221,4 +225,46 @@ def convert_to_homogeneous(data):
     data = T.AddSelfLoops(attr = "edge_attr", fill_value = 1.)(data)
     return data
 
-# TODO: Graph Plotting Utilities
+def draw_VCG_graph_from_formula(formula):
+    G = nx.Graph()
+    num_vars = formula[1]
+    num_clauses = len(formula[2])
+    for clause_idx, clause in enumerate(formula[2]):
+        for literal in clause:
+            sign, v_idx = F.literal2v_idx(literal)
+            G.add_edge(clause_idx + num_vars, v_idx, weight=sign)
+    top_vars = range(num_vars)
+    pos_edges = [(u,v) for u,v,d in G.edges(data=True) if d['weight'] == True]
+    neg_edges = [(u,v) for u,v,d in G.edges(data=True) if d['weight'] == False]
+    pos = nx.bipartite_layout(G, top_vars, align="horizontal")
+    fig, ax = plt.subplots(figsize=(12,7))
+    ax.set_title(f"Satisfiability: {formula[0]} (red indicates negative polarity)")
+    nx.draw_networkx_nodes(G, pos, ax=ax)
+    nx.draw_networkx_edges(G, pos, ax=ax, edgelist=pos_edges, edge_color='blue')
+    nx.draw_networkx_edges(G, pos, ax=ax, edgelist=neg_edges, edge_color='red')
+    edge_labels = nx.get_edge_attributes(G, 'weight')
+    nx.draw_networkx_labels(G, pos, ax=ax)
+    nx.draw_networkx_edge_labels(G, pos, ax=ax, edge_labels=edge_labels)
+    plt.show()
+    return
+
+def draw_VCG_graph_from_data(data):
+    data = deepcopy(data)
+    data = data.to_homogeneous()
+    G = to_networkx(data, node_attrs=['node_index','x'], edge_attrs=['edge_attr'], to_undirected=True)
+    top_var_cond = data.x.squeeze()==1
+    top_vars = top_var_cond.nonzero().squeeze().numpy()
+    pos_edges = [(u,v) for u,v,d in G.edges(data=True) if d['edge_attr'] == True]
+    neg_edges = [(u,v) for u,v,d in G.edges(data=True) if d['edge_attr'] == False]
+    pos = nx.bipartite_layout(G, top_vars, align="horizontal")
+    fig, ax = plt.subplots(figsize=(12,7))
+    ax.set_title(f"Satisfiability: {data.y.item()} (red indicates negative polarity)")
+    nx.draw_networkx_nodes(G, pos, ax=ax)
+    nx.draw_networkx_edges(G, pos, ax=ax, edgelist = pos_edges, edge_color='blue')
+    nx.draw_networkx_edges(G, pos, ax=ax, edgelist = neg_edges, edge_color='red')
+    edge_labels = nx.get_edge_attributes(G, 'edge_attr')
+    edge_labels = {k: bool(v) for k, v in edge_labels.items()}
+    nx.draw_networkx_labels(G, pos, ax=ax)
+    nx.draw_networkx_edge_labels(G, pos, ax=ax, edge_labels=edge_labels)
+    plt.show()
+    return
