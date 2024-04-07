@@ -7,21 +7,83 @@ from torch_geometric.utils import add_self_loops
 from torch_geometric.utils import contains_self_loops
 from torch_geometric.utils import to_networkx
 
-from torch_geometric.nn import GCNConv, GATConv, Linear, to_hetero
+from torch_geometric.nn import HeteroConv, GCNConv, GATConv, Linear, to_hetero
 
 #region G4SATBench
-# class G4GCNConv(MessagePassing):
 
+class G4GCN(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.lin0_c = Linear(1, 2)
+        self.lin0_v = Linear(1, 2)
+        self.lins_c = []
+        self.lins_v = []
+        self.lin_out = Linear(2, 1)
+        self.convs = torch.nn.ModuleList()
+        for _ in range(4):
+            conv = HeteroConv({
+                ('clause', 'contains_pos', 'variable'): G4GCNConv(),
+                ('clause', 'contains_neg', 'variable'): G4GCNConv(),
+                ('variable', 'rev_contains_pos', 'clause'): G4GCNConv(),
+                ('variable', 'rev_contains_neg', 'clause'): G4GCNConv()
+            }, aggr='cat')
+            self.convs.append(conv)
+            self.lins_c.append(Linear(6, 2))
+            self.lins_v.append(Linear(6, 2))
 
-# class G4GCN(torch.nn.Module):
-#     def __init__(self):
-#         super().__init__()
-#         self.lin_clauses = Linear(1, 16)
-#         self.lin_vars = Linear(1, 16)
-#         self.conv1 = GCNConv((-1, -1), 16)
-#         self.conv2 = GCNConv((-1, -1), 16)
-#         self.conv3 = GCNConv((-1, -1), 16)
-#         self.conv4 = GCNConv((-1, -1), 1)
+    def forward(self, x_dict, deg_dict, edge_index_dict):
+        x_dict['clause'] = self.lin0_c(x_dict['clause'])
+        x_dict['variable'] = self.lin0_v(x_dict['variable'])
+        for layer, conv in enumerate(self.convs):
+            x_dict_prev = x_dict
+            x_dict = conv(x_dict, deg_dict, edge_index_dict)
+            x_dict['clause'] = torch.cat([x_dict['clause'], x_dict_prev['clause']], dim=1)
+            x_dict['variable'] = torch.cat([x_dict['variable'], x_dict_prev['variable']], dim=1)
+            x_dict['clause'] = self.lins_c[layer](x_dict['clause'])
+            x_dict['variable'] = self.lins_v[layer](x_dict['variable'])
+        out = x_dict['variable']
+        return out
+
+class G4GCNConv(MessagePassing):
+    # Must manually ensure that models have the same parameters when initialized
+    def __init__(self, src_channels=2, tgt_channels=2, out_channels=2):
+        super().__init__(aggr='add')  # "Add" aggregation (Step 5).
+        self.lin_src = Linear(src_channels, out_channels, bias=True)
+        self.lin_src.reset_parameters()
+
+    def forward(self, x, deg, edge_index):
+        # Linearly transform node feature matrix.
+        x_src, x_trg = x
+        x_src = self.lin_src(x_src).relu()
+
+        # Compute normalization.
+        src, trg = edge_index
+        deg_src, deg_trg = deg
+        deg_src_inv_sqrt = deg_src.pow(-0.5)
+        deg_src_inv_sqrt[deg_src_inv_sqrt == float('inf')] = 0
+        deg_trg_inv_sqrt = deg_trg.pow(-0.5)
+        deg_trg_inv_sqrt[deg_trg_inv_sqrt == float('inf')] = 0
+        norm = deg_src_inv_sqrt[src] * deg_trg_inv_sqrt[trg]
+
+        # Start propagating messages.
+        out = self.propagate(edge_index, x=x, norm=norm)
+
+        return out
+
+    def message(self, x_i, x_j, norm):
+        # x_j has shape [E, out_channels]
+
+        # Normalize node features.
+        return norm.view(-1, 1) * x_j + x_i
+
+class G4GCN_Lin(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.lin = Linear(1, 2, bias=False)
+
+    def forward(self, x):
+        x = self.lin(x)
+        return x
 
 #endregion
 class MLP(torch.nn.Module):

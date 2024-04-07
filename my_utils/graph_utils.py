@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from torch_geometric.data import HeteroData
 import torch_geometric.transforms as T
+from torch_geometric.utils import degree
 from my_utils import formula_utils as F
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -87,6 +88,58 @@ def convert_instance_to_VCG(formula):
  
     assert data.node_types == ['clause', 'variable']
     assert data.edge_types == [('clause','contains','variable')]
+    assert data['clause'].num_nodes == num_clauses
+    assert data['clause'].num_features == 1
+    assert data['variable'].num_nodes == num_variables
+    assert data['variable'].num_features == 1
+    
+    data = T.ToUndirected()(data)
+    return data
+
+def convert_instance_to_VCG_bi(formula):
+    """
+    Convert a boolean formula instance to a heterogeneous graph as per NeuroBack by Wang et al.
+    """
+    label = formula[0]
+    num_variables = formula[1]
+    num_clauses = len(formula[2])
+  
+    sources = []
+    targets = []
+    polarity = []
+    for clause_id, clause in enumerate(formula[2]):
+        for literal in clause:
+            sign, variable_idx = F.literal2v_idx(literal)
+            sources.append(clause_id)
+            targets.append(variable_idx)
+            polarity.append(sign)
+ 
+    data = HeteroData()
+    data.y = torch.tensor([[label]]).float()
+    data['clause'].x = torch.from_numpy(-np.expand_dims(np.ones(num_clauses),1)).float()
+    data['clause'].node_index = torch.arange(num_clauses).long()
+    data['variable'].x = torch.from_numpy(np.expand_dims(np.ones(num_variables),1)).float()
+    data['variable'].node_index = torch.arange(num_variables).long()
+ 
+    sources = np.array(sources)
+    polarity = np.array(polarity)
+    pos_sources = torch.from_numpy(sources[polarity]).long()
+    neg_sources = torch.from_numpy(sources[~polarity]).long()
+    targets = np.array(targets)
+    pos_targets = torch.from_numpy(targets[polarity]).long()
+    neg_targets = torch.from_numpy(targets[~polarity]).long()
+    data['clause', 'contains_pos', 'variable'].edge_index = torch.stack([pos_sources, pos_targets], dim=0)
+    data['clause', 'contains_neg', 'variable'].edge_index = torch.stack([neg_sources, neg_targets], dim=0)
+    
+    sources = torch.from_numpy(sources).long()
+    targets = torch.from_numpy(targets).long()
+    edge_index = torch.stack([sources, targets], dim=0)
+    src, trg = edge_index
+    data['clause'].deg = degree(src)
+    data['variable'].deg = degree(trg)
+ 
+    assert data.node_types == ['clause', 'variable']
+    assert data.edge_types == [('clause','contains_pos','variable'), ('clause', 'contains_neg', 'variable')]
     assert data['clause'].num_nodes == num_clauses
     assert data['clause'].num_features == 1
     assert data['variable'].num_nodes == num_variables
