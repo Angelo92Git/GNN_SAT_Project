@@ -4,6 +4,7 @@ from torch_geometric.nn import GCNConv, to_hetero
 import torch_geometric.transforms as T
 from torch_geometric.loader import DataLoader
 from torch_geometric.utils import to_networkx
+from torch_scatter import scatter_mean
 
 import os
 from tqdm import tqdm, trange
@@ -18,7 +19,7 @@ from my_utils import graph_utils as f2g
 import models as m
 
 torch.manual_seed(42)
-skip_read = 1
+skip_read = 0
 
 if not skip_read:
 
@@ -43,9 +44,9 @@ if not skip_read:
     # print(f"satisfiability: {formulas[0][0]} vars: {formulas[0][1]} clauses: {len(formulas[0][2])}")
 
     # Process data
-    training_dataset = [f2g.convert_instance_to_VCG_with_meta_node(formula) for formula in training_formulas]
+    training_dataset = [f2g.convert_instance_to_VCG_bi(formula) for formula in training_formulas]
     # training_dataset = [f2g.convert_to_homogeneous(data) for data in training_dataset] # each data object here is a graph
-    testing_dataset = [f2g.convert_instance_to_VCG_with_meta_node(formula) for formula in testing_formulas]
+    testing_dataset = [f2g.convert_instance_to_VCG_bi(formula) for formula in testing_formulas]
     # testing_dataset = [f2g.convert_to_homogeneous(data) for data in testing_dataset]
 
     # Save data
@@ -70,21 +71,23 @@ test_loader = DataLoader(testing_dataset, batch_size=20, shuffle=True)
 
 # Define the model, optimizer, and loss function
 metadata = training_dataset[0].metadata()
-model = m.GAT(hidden_channels=16, out_channels=1)
-model = to_hetero(model, metadata, aggr='sum')
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-8)
+model = m.G4GCN()
+decoder = torch.nn.Linear(2, 1)
+model_params = list(model.parameters()) + list(decoder.parameters())
+optimizer = torch.optim.Adam(model_params, lr=1e-4, weight_decay=1e-8)
 train_criterion = BCELoss()
 test_criterion = BCELoss(reduction='sum')
 
 # Train the model
 model.train()
 loss_record = []
-pbar = tqdm(range(20), desc="Starting")
+pbar = tqdm(range(5), desc="Starting")
 for epoch in pbar:
     for batched_graphs in train_loader:
         optimizer.zero_grad()
-        out = model(batched_graphs.x_dict, batched_graphs.edge_index_dict, batched_graphs.edge_attr_dict)
-        out = out['meta']
+        out = model(batched_graphs.x_dict, batched_graphs.deg_dict, batched_graphs.edge_index_dict)
+        out = scatter_mean(out, batched_graphs['variable']['batch'], dim=0)
+        out = decoder(out).sigmoid()
         loss = train_criterion(out, batched_graphs.y)
         with torch.no_grad():
             pbar.set_description(f"Loss: {loss.item():.2f}")
@@ -92,18 +95,22 @@ for epoch in pbar:
         loss.backward()
         optimizer.step()
 
+plt.plot(loss_record)
+plt.ylim([0, 1])
+plt.show()
+
 # Test the model
 model.eval()
 with torch.no_grad():
     loss = 0
     for batched_graphs in tqdm(test_loader):
-        out = model(batched_graphs.x_dict, batched_graphs.edge_index_dict, batched_graphs.edge_attr_dict)
-        out = out['meta']
-        print(out)
+        out = model(batched_graphs.x_dict, batched_graphs.deg_dict, batched_graphs.edge_index_dict)
+        out = scatter_mean(out, batched_graphs['variable']['batch'], dim=0)
+        out = decoder(out).sigmoid()
         loss += (torch.round(out) - batched_graphs.y).abs().sum()
-        print(loss.item())
 
     print(f"Test loss: {loss/num_testing_instances*100:.2f}%")
+plt.close()
 
 
 
