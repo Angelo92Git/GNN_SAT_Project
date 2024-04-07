@@ -7,21 +7,54 @@ from torch_geometric.utils import add_self_loops
 from torch_geometric.utils import contains_self_loops
 from torch_geometric.utils import to_networkx
 
-from torch_geometric.nn import GATConv, Linear, to_hetero
+from torch_geometric.nn import GCNConv, GATConv, Linear, to_hetero
+
+#region G4SATBench
+# class G4GCNConv(MessagePassing):
+
+
+# class G4GCN(torch.nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.lin_clauses = Linear(1, 16)
+#         self.lin_vars = Linear(1, 16)
+#         self.conv1 = GCNConv((-1, -1), 16)
+#         self.conv2 = GCNConv((-1, -1), 16)
+#         self.conv3 = GCNConv((-1, -1), 16)
+#         self.conv4 = GCNConv((-1, -1), 1)
+
+#endregion
+class MLP(torch.nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super().__init__()
+        self.lin1 = Linear(input_size, hidden_size)
+        self.lin2 = Linear(hidden_size, hidden_size)
+        self.lin3 = Linear(hidden_size, output_size)
+    
+    def forward(self, x):
+        x = self.lin1(x)
+        x = x.relu()
+        x = self.lin2(x)
+        x = x.relu()
+        x = self.lin3(x)
+        x = x.sigmoid()
+        return x
 
 class GAT(torch.nn.Module):
-    def __init__(self, hidden_channels, out_channels):
+    def __init__(self, hidden_channels):
         super().__init__()
+        self.lin0 = Linear(-1, hidden_channels, bias=False)
         self.conv1 = GATConv((-1, -1), hidden_channels, add_self_loops=False)
         self.lin1 = Linear(-1, hidden_channels, bias=False)
         self.conv2 = GATConv((-1, -1), hidden_channels, add_self_loops=False)
         self.lin2 = Linear(-1, hidden_channels, bias=False)
         self.conv3 = GATConv((-1, -1), hidden_channels, add_self_loops=False)
         self.lin3 = Linear(-1, hidden_channels, bias=False)
-        self.conv4 = GATConv((-1, -1), out_channels, add_self_loops=False)
-        self.lin4 = Linear(-1, out_channels, bias=False)
+        self.conv4 = GATConv((-1, -1), hidden_channels, add_self_loops=False)
+        self.lin4 = Linear(-1, hidden_channels, bias=False)
 
     def forward(self, x, edge_index, edge_attr):
+        x = self.lin0(x)
         x = self.conv1(x, edge_index, edge_attr) + self.lin1(x)
         x = x.relu()
         x = self.conv2(x, edge_index, edge_attr) + self.lin2(x)
