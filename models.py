@@ -9,9 +9,13 @@ from torch_geometric.nn import HeteroConv, GCNConv, GATConv, Linear, to_hetero
 
 #region G4SATBench
 
-class G4GCN(nn.Module):
-    def __init__(self, hidden_channels=8, num_conv_layers=4):
+class G4GCN_VCG(nn.Module):
+    def __init__(self, hidden_channels=8, num_conv_layers=4, include_meta_node=False):
         super().__init__()
+        self.include_meta_node = include_meta_node
+        if self.include_meta_node:
+            self.lin0_m = Linear(1, hidden_channels, bias=False)
+            self.lins_m = []
         self.lin0_c = Linear(1, hidden_channels, bias=False)
         self.lin0_v = Linear(1, hidden_channels, bias=False)
         self.convs = torch.nn.ModuleList()
@@ -19,24 +23,38 @@ class G4GCN(nn.Module):
         self.lins_v = []
 
         for _ in range(num_conv_layers):
-            conv = HeteroConv({
+            conv_dict = {
                 ('clause', 'contains_pos', 'variable'): G4GCNConv(*[hidden_channels]*3),
                 ('clause', 'contains_neg', 'variable'): G4GCNConv(*[hidden_channels]*3),
                 ('variable', 'rev_contains_pos', 'clause'): G4GCNConv(*[hidden_channels]*3),
                 ('variable', 'rev_contains_neg', 'clause'): G4GCNConv(*[hidden_channels]*3)
-            }, aggr='cat')
+            }
+            if self.include_meta_node:
+                conv_dict[('meta', 'connects', 'clause')] = G4GCNConv(*[hidden_channels]*3)
+                conv_dict[('clause', 'rev_connects', 'meta')] = G4GCNConv(*[hidden_channels]*3)
+                self.lins_m.append(Linear(hidden_channels*2, hidden_channels))
+                self.lins_c.append(Linear(hidden_channels*4, hidden_channels))
+                self.lins_v.append(Linear(hidden_channels*3, hidden_channels))
+            else:
+                self.lins_c.append(Linear(hidden_channels*3, hidden_channels))
+                self.lins_v.append(Linear(hidden_channels*3, hidden_channels))
+
+            conv = HeteroConv(conv_dict, aggr='cat')
             self.convs.append(conv)
-            self.lins_c.append(Linear(hidden_channels*3, hidden_channels))
-            self.lins_v.append(Linear(hidden_channels*3, hidden_channels))
         
         self.lin_out= Linear(hidden_channels, 1)
 
     def forward(self, x_dict, deg_dict, edge_index_dict):
+        if self.include_meta_node:
+            x_dict['meta'] = self.lin0_m(x_dict['meta'])
         x_dict['clause'] = self.lin0_c(x_dict['clause'])
         x_dict['variable'] = self.lin0_v(x_dict['variable'])
         for conv_layer, conv in enumerate(self.convs):
             x_dict_prev = x_dict
             x_dict = conv(x_dict, deg_dict, edge_index_dict)
+            if self.include_meta_node:
+                x_dict['meta'] = torch.cat([x_dict['meta'], x_dict_prev['meta']], dim=1)
+                x_dict['meta'] = self.lins_m[conv_layer](x_dict['meta'])
             x_dict['clause'] = torch.cat([x_dict['clause'], x_dict_prev['clause']], dim=1)
             x_dict['variable'] = torch.cat([x_dict['variable'], x_dict_prev['variable']], dim=1)
             x_dict['clause'] = self.lins_c[conv_layer](x_dict['clause'])
@@ -68,7 +86,6 @@ class G4GCNConv(MessagePassing):
 
         # Start propagating messages.
         out = self.propagate(edge_index, x=x, norm=norm)
-
         return out
 
     def message(self, x_i, x_j, norm):

@@ -11,6 +11,7 @@ def get_paths_to_instances(difficulty_levels, problem_types, splits, satisfiabil
         train_directory_paths.append((sat=='sat', file_count, directory_path))
     return train_directory_paths
 
+
 # read in the instances from (satisfiability, file_count, path) tuples
 def read_instances_from_paths(paths):
     formulas = []
@@ -66,6 +67,7 @@ def parse_cnf_file(file_path, split_clauses=False):
     else:
         return n_vars, clauses, learned_clauses
 
+
 # transform literal to variable index (0 based)
 def literal2v_idx(literal):
     assert abs(literal) > 0
@@ -73,8 +75,8 @@ def literal2v_idx(literal):
     v_idx = abs(literal) - 1
     return sign, v_idx
 
-
-# transform literal to literal index (0 based)
+#region not used
+# transform literal to unique integer index (non-consecutive)
 def literal2l_idx(literal):
     assert abs(literal) > 0
     sign = literal > 0
@@ -83,3 +85,4 @@ def literal2l_idx(literal):
         return v_idx * 2
     else:
         return v_idx * 2 + 1
+#endregion
