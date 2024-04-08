@@ -119,12 +119,17 @@ def convert_instance_to_VCG_bi_with_meta_node(formula):
     data['meta', 'connects', 'clause'].edge_index = torch.stack([torch.zeros(num_clauses).long(), torch.arange(num_clauses).long()], dim=0)
     data['clause', 'contains_pos', 'variable'].edge_index = torch.stack([pos_sources, pos_targets], dim=0)
     data['clause', 'contains_neg', 'variable'].edge_index = torch.stack([neg_sources, neg_targets], dim=0)
+
+    # only used for plotting 
+    data['meta', 'connects', 'clause'].polarity = torch.zeros(num_clauses).float()
+    data['clause', 'contains_pos', 'variable'].polarity = torch.ones(len(pos_sources)).float()
+    data['clause', 'contains_neg', 'variable'].polarity = -torch.ones(len(neg_sources)).float()
     
     sources = torch.from_numpy(sources).long()
     targets = torch.from_numpy(targets).long()
     edge_index = torch.stack([sources, targets], dim=0)
     src, trg = edge_index
-    data['meta'].deg = num_clauses
+    data['meta'].deg = torch.tensor([num_clauses]).long()
     data['clause'].deg = degree(src)
     data['variable'].deg = degree(trg)
  
@@ -167,6 +172,10 @@ def convert_instance_to_VCG_bi(formula):
     data['clause', 'contains_pos', 'variable'].edge_index = torch.stack([pos_sources, pos_targets], dim=0)
     data['clause', 'contains_neg', 'variable'].edge_index = torch.stack([neg_sources, neg_targets], dim=0)
     
+    # only used for plotting 
+    data['clause', 'contains_pos', 'variable'].polarity = torch.ones(len(pos_sources)).float()
+    data['clause', 'contains_neg', 'variable'].polarity = -torch.ones(len(neg_sources)).float()
+
     sources = torch.from_numpy(sources).long()
     targets = torch.from_numpy(targets).long()
     edge_index = torch.stack([sources, targets], dim=0)
@@ -174,13 +183,6 @@ def convert_instance_to_VCG_bi(formula):
     data['clause'].deg = degree(src)
     data['variable'].deg = degree(trg)
  
-    assert data.node_types == ['clause', 'variable']
-    assert data.edge_types == [('clause','contains_pos','variable'), ('clause', 'contains_neg', 'variable')]
-    assert data['clause'].num_nodes == num_clauses
-    assert data['clause'].num_features == 1
-    assert data['variable'].num_nodes == num_variables
-    assert data['variable'].num_features == 1
-    
     data = T.ToUndirected()(data)
     return data
 
@@ -307,42 +309,95 @@ def draw_VCG_graph_from_formula(formula):
     G = nx.Graph()
     num_vars = formula[1]
     num_clauses = len(formula[2])
+    labels = []
     for clause_idx, clause in enumerate(formula[2]):
         for literal in clause:
             sign, v_idx = F.literal2v_idx(literal)
             G.add_edge(clause_idx + num_vars, v_idx, weight=sign)
-    top_vars = range(num_vars)
+    vars = range(num_vars)
+    labels += [var+1 for var in vars]
+    labels += list(range(num_clauses))
+    labels = {k:v for k,v in zip(range(num_vars+num_clauses), labels)}
     pos_edges = [(u,v) for u,v,d in G.edges(data=True) if d['weight'] == True]
     neg_edges = [(u,v) for u,v,d in G.edges(data=True) if d['weight'] == False]
-    pos = nx.bipartite_layout(G, top_vars, align="horizontal")
+    pos = nx.bipartite_layout(G, vars, align="horizontal")
     fig, ax = plt.subplots(figsize=(12,7))
-    ax.set_title(f"Satisfiability: {formula[0]} (red indicates negative polarity)")
-    nx.draw_networkx_nodes(G, pos, ax=ax)
+    ax.set_title(f"Satisfiability: {formula[0]} (Red edges indicate negative polarity)")
+    nx.draw_networkx_nodes(G, pos, ax=ax, nodelist = range(num_vars), node_color='darkgreen')
+    nx.draw_networkx_nodes(G, pos, ax=ax, nodelist = range(num_vars, num_vars+num_clauses), node_color='black')
     nx.draw_networkx_edges(G, pos, ax=ax, edgelist=pos_edges, edge_color='blue')
     nx.draw_networkx_edges(G, pos, ax=ax, edgelist=neg_edges, edge_color='red')
-    edge_labels = nx.get_edge_attributes(G, 'weight')
-    nx.draw_networkx_labels(G, pos, ax=ax)
-    nx.draw_networkx_edge_labels(G, pos, ax=ax, edge_labels=edge_labels)
+    # edge_labels = nx.get_edge_attributes(G, 'weight')
+    nx.draw_networkx_labels(G, pos, labels=labels, ax=ax, font_color="whitesmoke")
+    # nx.draw_networkx_edge_labels(G, pos, ax=ax, edge_labels=edge_labels)
     plt.show()
     return
 
-def draw_VCG_graph_from_data(data):
+def draw_VCG_graph_from_VCG_data(data):
     data = deepcopy(data)
-    data = data.to_homogeneous()
-    G = to_networkx(data, node_attrs=['node_index','x'], edge_attrs=['edge_attr'], to_undirected=True)
-    top_var_cond = data.x.squeeze()==1
-    top_vars = top_var_cond.nonzero().squeeze().numpy()
-    pos_edges = [(u,v) for u,v,d in G.edges(data=True) if d['edge_attr'] == True]
-    neg_edges = [(u,v) for u,v,d in G.edges(data=True) if d['edge_attr'] == False]
-    pos = nx.bipartite_layout(G, top_vars, align="horizontal")
+    if 'meta' in data.metadata()[0]:
+        data['meta'].node_index = torch.tensor([[0]]).long()
+    G = to_networkx(data, node_attrs=['node_index', 'x', 'deg'], edge_attrs=['polarity'])
+    node_x = np.array([x for k,x in nx.get_node_attributes(G, 'x').items()]).squeeze()
+    if 'meta' in data.metadata()[0]:
+        meta = np.array(G.nodes)[node_x==0]
+        G.remove_node(meta[0])
+        node_x = np.array([x for k,x in nx.get_node_attributes(G, 'x').items()]).squeeze()
+    vars = np.array(G.nodes)[node_x==1]
+    label_vars = {var: idx+1 for idx, var in enumerate(vars)}
+    clauses = np.array(G.nodes)[node_x==-1]
+    label_clauses = {clause: idx for idx, clause in enumerate(clauses)}
+    labels = {**label_vars, **label_clauses}
+    pos_edges = [(u,v) for u,v,d in G.edges(data=True) if d['polarity'] == 1.]
+    neg_edges = [(u,v) for u,v,d in G.edges(data=True) if d['polarity'] == -1.]
+    pos = nx.bipartite_layout(G, vars, align="horizontal")
     fig, ax = plt.subplots(figsize=(12,7))
-    ax.set_title(f"Satisfiability: {data.y.item()} (red indicates negative polarity)")
-    nx.draw_networkx_nodes(G, pos, ax=ax)
+    ax.set_title(f"Satisfiability: {bool(data.y.item())} (red indicates negative polarity)")
+    nx.draw_networkx_nodes(G, pos, ax=ax, nodelist=vars, node_color='darkgreen')
+    nx.draw_networkx_nodes(G, pos, ax=ax, nodelist=clauses, node_color='black')
     nx.draw_networkx_edges(G, pos, ax=ax, edgelist = pos_edges, edge_color='blue')
     nx.draw_networkx_edges(G, pos, ax=ax, edgelist = neg_edges, edge_color='red')
-    edge_labels = nx.get_edge_attributes(G, 'edge_attr')
-    edge_labels = {k: bool(v) for k, v in edge_labels.items()}
-    nx.draw_networkx_labels(G, pos, ax=ax)
-    nx.draw_networkx_edge_labels(G, pos, ax=ax, edge_labels=edge_labels)
+    edge_labels = nx.get_edge_attributes(G, 'polarity')
+    # edge_labels = {k: bool(v) for k, v in edge_labels.items()}
+    nx.draw_networkx_labels(G, pos, labels=labels, ax=ax, font_color="whitesmoke")
+    # nx.draw_networkx_edge_labels(G, pos, ax=ax, edge_labels=edge_labels)
+    plt.show()
+    return
+
+def draw_LCG_graph_from_formula(formula):
+    G = nx.Graph()
+    num_vars = formula[1]
+    num_clauses = len(formula[2])
+    labels = []
+    literals = []
+    for clause in formula[2]:
+        for literal in clause:
+            if literal not in literals:
+                literals.append(literal)
+    num_literals = len(literals)
+    literal_index = range(num_literals)
+    literal_node_index_lookup = {literal: idx for idx, literal in zip(literal_index, literals)}
+    for clause_idx, clause in enumerate(formula[2]):
+        for literal in clause:
+            G.add_edge(clause_idx + num_literals, literal_node_index_lookup[literal], weight=0)
+    labels += literals
+    labels += list(range(num_clauses))
+    labels = {k:v for k,v in zip(range(num_literals+num_clauses), labels)}
+    positive_literals = list(filter(lambda x: x>0, literals))
+    negative_literals = list(filter(lambda x: x<0, literals))
+    for literal in positive_literals:
+        if -literal in negative_literals:
+            G.add_edge(literal_node_index_lookup[literal], literal_node_index_lookup[-literal], weight=1)
+    clause_literal_edges = [(u,v) for u,v,d in G.edges(data=True) if d['weight'] == 0]
+    literal_2_edges = [(u,v) for u,v,d in G.edges(data=True) if d['weight'] == 1]
+
+    pos = nx.bipartite_layout(G, literal_index, align="horizontal")
+    fig, ax = plt.subplots(figsize=(12,7))
+    ax.set_title(f"Satisfiability: {formula[0]}")
+    nx.draw_networkx_nodes(G, pos, ax=ax, nodelist=range(num_literals), node_color='darkgreen')
+    nx.draw_networkx_nodes(G, pos, ax=ax, nodelist=range(num_literals, num_literals+num_clauses), node_color='black')
+    nx.draw_networkx_edges(G, pos, ax=ax, edgelist=clause_literal_edges, edge_color='blue')
+    nx.draw_networkx_edges(G, pos, ax=ax, edgelist=literal_2_edges, edge_color='red')
+    nx.draw_networkx_labels(G, pos, labels=labels, ax=ax, font_color="whitesmoke")
     plt.show()
     return
