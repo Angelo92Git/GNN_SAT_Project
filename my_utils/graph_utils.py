@@ -201,17 +201,18 @@ def convert_instance_to_LCG_with_meta_node(formula, add_self_loops=False):
         for literal in clause:
             if literal not in literals:
                 literals.append(literal)
+                literals.append(-literal)
             sources.append(clause_id)
             targets.append(literal)
     
     l2l_sources = []
     l2l_targets = []
-    positive_literals = list(filter(lambda x: x>0, literals))
-    negative_literals = list(filter(lambda x: x<0, literals))
-    for literal in positive_literals:
-        if -literal in negative_literals:
-            l2l_sources.append(literal)
-            l2l_targets.append(-literal)
+    variables = list(filter(lambda x: x>0, literals))
+    for variable in variables:
+            l2l_sources.append(variable)
+            l2l_targets.append(-variable)
+            l2l_sources.append(-variable)
+            l2l_targets.append(variable)
 
     num_literals = len(literals)
     data = HeteroData()
@@ -239,7 +240,14 @@ def convert_instance_to_LCG_with_meta_node(formula, add_self_loops=False):
 
     data['meta'].deg = torch.tensor([num_clauses]).long()
     data['clause'].deg = degree(sources) + torch.ones_like(degree(sources))
-    data['literal'].deg = degree(targets) + degree(l2l_targets)
+    # Address the case where the trailing literals do not appear in any clause
+    if len(degree(targets)) < num_literals:
+        data['literal'].deg = torch.cat([degree(targets), torch.from_numpy(np.zeros(num_literals - len(degree(targets)))).long()])
+    elif len(degree(targets)) == num_literals:
+        data['literal'].deg = degree(targets)
+    else:
+        ValueError("Number of literals exceeds number of clauses in LCG graph")
+    data['literal'].deg += degree(l2l_targets)
     
     data = T.ToUndirected()(data)
     if add_self_loops:
@@ -261,17 +269,19 @@ def convert_instance_to_LCG(formula, add_self_loops=False):
         for literal in clause:
             if literal not in literals:
                 literals.append(literal)
+                literals.append(-literal)
             sources.append(clause_id)
             targets.append(literal)
     
     l2l_sources = []
     l2l_targets = []
-    positive_literals = list(filter(lambda x: x>0, literals))
-    negative_literals = list(filter(lambda x: x<0, literals))
-    for literal in positive_literals:
-        if -literal in negative_literals:
-            l2l_sources.append(literal)
-            l2l_targets.append(-literal)
+    variables = list(filter(lambda x: x>0, literals))
+    for variable in variables:
+            l2l_sources.append(variable)
+            l2l_targets.append(-variable)
+            l2l_sources.append(-variable)
+            l2l_targets.append(variable)
+
 
 
     num_literals = len(literals)
@@ -296,7 +306,14 @@ def convert_instance_to_LCG(formula, add_self_loops=False):
     data['literal', 'paired_with', 'literal'].edge_index = torch.stack([l2l_sources, l2l_targets], dim=0)
     
     data['clause'].deg = degree(sources)
-    data['literal'].deg = degree(targets) + degree(l2l_targets)
+    # Address the case where the trailing literals do not appear in any clause
+    if len(degree(targets)) < num_literals:
+        data['literal'].deg = torch.cat([degree(targets), torch.from_numpy(np.zeros(num_literals - len(degree(targets)))).long()])
+    elif len(degree(targets)) == num_literals:
+        data['literal'].deg = degree(targets)
+    else:
+        ValueError("Number of literals exceeds number of clauses in LCG graph")
+    data['literal'].deg += degree(l2l_targets)
 
     data = T.ToUndirected()(data)
     if add_self_loops:
