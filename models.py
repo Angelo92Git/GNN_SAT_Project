@@ -92,7 +92,7 @@ class G4GCNConv(MessagePassing):
         # x_j has shape [E, out_channels]
 
         # Normalize node features.
-        return norm.view(-1, 1) * self.MLP(x_j)
+        return norm.view(-1, 1) * self.MLP(x_j).relu()
 
 
 #endregion
@@ -107,7 +107,7 @@ class MLP(nn.Module):
         layers = []
         for layer, layer_size in enumerate(layer_sizes[:-1]):
             layers.append(Linear(layer_sizes[layer], layer_sizes[layer+1], bias=True))
-            if layer != len(layer_sizes) - 1:
+            if layer != len(layer_sizes[:-1]) - 1:
                 layers.append(nn.ReLU())
         self.linear_layers = nn.Sequential(*layers)
     
