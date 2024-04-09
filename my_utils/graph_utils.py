@@ -130,7 +130,7 @@ def convert_instance_to_VCG_bi_with_meta_node(formula):
     edge_index = torch.stack([sources, targets], dim=0)
     src, trg = edge_index
     data['meta'].deg = torch.tensor([num_clauses]).long()
-    data['clause'].deg = degree(src) # Message passing happens within each relation type, no need to account for meta node
+    data['clause'].deg = degree(src) + torch.ones_like(degree(src))
     data['variable'].deg = degree(trg)
  
     data = T.ToUndirected()(data)
@@ -190,7 +190,6 @@ def convert_instance_to_LCG_with_meta_node(formula, add_self_loops=False):
     """
     Convert a boolean formula instance to LCG* as per G4SatBench by Li et al.
     """
-    #TODO create a clean node index for literals
     label = formula[0]
     num_variables = formula[1]
     num_clauses = len(formula[2])
@@ -239,8 +238,8 @@ def convert_instance_to_LCG_with_meta_node(formula, add_self_loops=False):
     data['literal', 'paired_with', 'literal'].edge_index = torch.stack([l2l_sources, l2l_targets], dim=0)
 
     data['meta'].deg = torch.tensor([num_clauses]).long()
-    data['clause'].deg = degree(sources) # Message passing happens within each relation type, no need to account for meta node
-    data['literal'].deg = degree(targets) # Message passing happens within each relation type, no need to account for literal pairs
+    data['clause'].deg = degree(sources) + torch.ones_like(degree(sources))
+    data['literal'].deg = degree(targets) + degree(l2l_targets)
     
     data = T.ToUndirected()(data)
     if add_self_loops:
@@ -296,8 +295,8 @@ def convert_instance_to_LCG(formula, add_self_loops=False):
     data['clause', 'contains', 'literal'].edge_index = torch.stack([sources, targets], dim=0)
     data['literal', 'paired_with', 'literal'].edge_index = torch.stack([l2l_sources, l2l_targets], dim=0)
     
-    data['clause'].deg = degree(sources) # Message passing happens within each relation type, no need to account for meta node
-    data['literal'].deg = degree(targets) # Message passing happens within each relation type, no need to account for literal pairs
+    data['clause'].deg = degree(sources)
+    data['literal'].deg = degree(targets) + degree(l2l_targets)
 
     data = T.ToUndirected()(data)
     if add_self_loops:
