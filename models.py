@@ -40,8 +40,6 @@ class G4GCN_LCG(nn.Module):
 
             conv = HeteroConv(conv_dict, aggr='cat')
             self.convs.append(conv)
-        
-        self.lin_out= Linear(hidden_channels, 1)
     
     def forward(self, x_dict, deg_dict, edge_index_dict):
         if self.include_meta_node:
@@ -96,8 +94,6 @@ class G4GCN_VCG(nn.Module):
 
             conv = HeteroConv(conv_dict, aggr='cat')
             self.convs.append(conv)
-        
-        self.lin_out= Linear(hidden_channels, 1)
 
     def forward(self, x_dict, deg_dict, edge_index_dict):
         if self.include_meta_node:
