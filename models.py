@@ -15,7 +15,7 @@ class G4GCN_LCG(nn.Module):
         self.include_meta_node = include_meta_node
         if self.include_meta_node:
             self.lin0_m = Linear(1, hidden_channels, bias=False)
-            self.lins_m = []
+            self.lins_m = torch.nn.ModuleList()
         self.lin0_c = Linear(1, hidden_channels, bias=False)
         self.lin0_v = Linear(1, hidden_channels, bias=False)
         self.convs = torch.nn.ModuleList()
@@ -68,7 +68,7 @@ class G4GCN_VCG(nn.Module):
         self.include_meta_node = include_meta_node
         if self.include_meta_node:
             self.lin0_m = Linear(1, hidden_channels, bias=False)
-            self.lins_m = []
+            self.lins_m = torch.nn.ModuleList()
         self.lin0_c = Linear(1, hidden_channels, bias=False)
         self.lin0_v = Linear(1, hidden_channels, bias=False)
         self.convs = torch.nn.ModuleList()
