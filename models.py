@@ -74,7 +74,7 @@ class G4GCNConv(MessagePassing):
         # x_j has shape [E, out_channels]
 
         # Normalize node features.
-        return norm.view(-1, 1) * x_j + x_i
+        return norm.view(-1, 1) * x_j + x_i # This helps learning when hidden_dim = 2
 
 class G4GCN_Lin(torch.nn.Module):
     def __init__(self):
