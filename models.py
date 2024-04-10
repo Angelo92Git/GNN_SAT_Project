@@ -19,8 +19,8 @@ class G4GCN_LCG(nn.Module):
         self.lin0_c = Linear(1, hidden_channels, bias=False)
         self.lin0_v = Linear(1, hidden_channels, bias=False)
         self.convs = torch.nn.ModuleList()
-        self.lins_c = []
-        self.lins_v = []
+        self.lins_c = torch.nn.ModuleList()
+        self.lins_v = torch.nn.ModuleList()
 
         for _ in range(num_conv_layers):
             conv_dict = {
@@ -74,8 +74,8 @@ class G4GCN_VCG(nn.Module):
         self.lin0_c = Linear(1, hidden_channels, bias=False)
         self.lin0_v = Linear(1, hidden_channels, bias=False)
         self.convs = torch.nn.ModuleList()
-        self.lins_c = []
-        self.lins_v = []
+        self.lins_c = torch.nn.ModuleList()
+        self.lins_v = torch.nn.ModuleList()
 
         for _ in range(num_conv_layers):
             conv_dict = {
