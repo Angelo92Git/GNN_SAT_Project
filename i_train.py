@@ -108,6 +108,8 @@ def main():
                 train_loss_record.append(train_loss.item())
 
         model.eval()
+        predictions = []
+        labels = []
         with torch.no_grad():
             for batched_data in val_loader:
                 batched_data = batched_data.to(device)
@@ -115,6 +117,8 @@ def main():
                 out = scatter_mean(out, batched_data["variable"]["batch"], dim=0)
                 out = decoder(out).sigmoid()
                 val_loss = BCELoss()(out, batched_data.y)
+                predictions = np.concatenate([predictions, torch.round(out).T.cpu().numpy()[0]], 0)
+                labels = np.concatenate([labels, batched_data.y.T.cpu().numpy()[0]], 0)
                 val_loss_record.append(val_loss.item())
             cumulative_loss = sum(val_loss_record)
             if cumulative_loss < best_val_loss:
@@ -125,7 +129,8 @@ def main():
             
     print("Training complete.")
     print(f"Training BCE Losses - min: {min(train_loss_record):.2f}, max: {max(train_loss_record):.2f}")
-    print(f"Best validation loss - {best_val_loss/num_validation_instances:.2f}%")
+    accuracy = np.sum(predictions == labels) / num_validation_instances
+    print(f"Best validation accuracy - {accuracy*100:.2f}%")
 
 
 if __name__ == "__main__":
