@@ -93,8 +93,8 @@ def main():
                 out = model(batched_data.x_dict, batched_data.deg_dict, batched_data.edge_index_dict)
                 out = scatter_mean(out, batched_data["variable"]["batch"], dim=0)
                 out = decoder(out).sigmoid()
-                labels = np.concatenate([labels, batched_data.y.T.numpy()[0]], 0)
-                predictions = np.concatenate([predictions, torch.round(out).T.numpy()[0]], 0)
+                labels = np.concatenate([labels, batched_data.y.T.cpu().numpy()[0]], 0)
+                predictions = np.concatenate([predictions, torch.round(out).T.cpu().numpy()[0]], 0)
 
         print("Testing Complete.")
         accuracy = np.sum(predictions == labels) / num_testing_instances
