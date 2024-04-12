@@ -4,7 +4,7 @@ import torch_geometric.transforms as T
 from torch_geometric.loader import DataLoader
 from torch_scatter import scatter_mean
 
-from tqdm import tqdm, trange
+from tqdm.auto import tqdm, trange
 from itertools import product
 import numpy as np
 import argparse
