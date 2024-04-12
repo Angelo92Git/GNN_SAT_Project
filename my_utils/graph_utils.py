@@ -380,7 +380,7 @@ def draw_VCG_graph_from_VCG_data(data):
     data = deepcopy(data)
     if 'meta' in data.metadata()[0]:
         data['meta'].node_index = torch.tensor([[0]]).long()
-    G = to_networkx(data, node_attrs=['node_index', 'x', 'deg'], edge_attrs=['polarity'])
+    G = to_networkx(data, node_attrs=['node_index', 'x'], edge_attrs=['polarity'])
     node_x = np.array([x for k,x in nx.get_node_attributes(G, 'x').items()]).squeeze()
     if 'meta' in data.metadata()[0]:
         meta = np.array(G.nodes)[node_x==0]
