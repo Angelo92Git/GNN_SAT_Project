@@ -119,7 +119,7 @@ class G4GCNConv(MessagePassing):
         super().__init__(aggr='add')  # "Add" aggregation (Step 5).
         self.lin_src = Linear(src_channels, out_channels, bias=True)
         self.lin_src.reset_parameters()
-        self.MLP = MLP([out_channels, out_channels, out_channels, out_channels])
+        self.MLP = MLP([out_channels, out_channels, out_channels])
 
     def forward(self, x, deg, edge_index):
         # Linearly transform node feature matrix.

@@ -73,7 +73,7 @@ def main():
         hidden_channels = param_dict["latent_dim"]
         num_conv_layers = param_dict["num_conv_layers"]
         model = models_available[param_dict["model"]][param_dict["representation"]](hidden_channels=hidden_channels, num_conv_layers=num_conv_layers)
-        decoder = m.MLP([hidden_channels, hidden_channels, hidden_channels, 1])
+        decoder = m.MLP([hidden_channels, hidden_channels, 1])
         
         # Load model
         model_path = f"./best_model_params/m_{test_model_param}.pt"

@@ -79,7 +79,7 @@ def main():
         include_meta_node = False
 
     model = model_choices[args.model](hidden_channels=hidden_channels, num_conv_layers=args.num_conv_layers, include_meta_node=include_meta_node)
-    decoder = m.MLP([hidden_channels, hidden_channels, hidden_channels, 1])
+    decoder = m.MLP([hidden_channels, hidden_channels, 1])
     model.to(device)
     decoder.to(device)
     model_params = list(model.parameters()) + list(decoder.parameters())
