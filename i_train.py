@@ -3,6 +3,7 @@ from torch.nn import BCELoss
 import torch_geometric.transforms as T
 from torch_geometric.loader import DataLoader
 from torch_scatter import scatter_mean
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from tqdm.auto import tqdm, trange
 from itertools import product
@@ -84,6 +85,7 @@ def main():
     decoder.to(device)
     model_params = list(model.parameters()) + list(decoder.parameters())
     optimizer = torch.optim.Adam(model_params, lr=1e-4, weight_decay=1e-8)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=10)
 
     # Train model
     train_loss_record = []
@@ -92,37 +94,38 @@ def main():
     pbar = trange(args.epochs, desc="Epoch")
     for epoch in pbar:
         model.train()
-        train_loss = 0
         for batched_data in train_loader:
             batched_data = batched_data.to(device)
             optimizer.zero_grad()
             out = model(batched_data.x_dict, batched_data.deg_dict , batched_data.edge_index_dict)
             out = scatter_mean(out, batched_data["variable"]["batch"], dim=0)
             out = decoder(out).sigmoid()
-            loss = BCELoss()(out, batched_data.y)
-            with torch.no_grad():
-                pbar.set_description(f"loss: {loss.item():.2f}")
-                train_loss_record.append(loss.item())
-            loss.backward()
+            train_loss = BCELoss()(out, batched_data.y)
+            train_loss.backward()
             optimizer.step()
+            with torch.no_grad():
+                pbar.set_description(f"loss: {train_loss.item():.2f}")
+                train_loss_record.append(train_loss.item())
 
         model.eval()
         with torch.no_grad():
-            cumulative_loss = 0
             for batched_data in val_loader:
                 batched_data = batched_data.to(device)
                 out = model(batched_data.x_dict, batched_data.deg_dict , batched_data.edge_index_dict)
                 out = scatter_mean(out, batched_data["variable"]["batch"], dim=0)
                 out = decoder(out).sigmoid()
-                cumulative_loss += (torch.round(out) - batched_data.y).abs().sum().item()
-            val_loss_record.append(cumulative_loss/num_validation_instances*100)
+                val_loss = BCELoss()(out, batched_data.y)
+                val_loss_record.append(val_loss.item())
+            cumulative_loss = sum(val_loss_record)
             if cumulative_loss < best_val_loss:
                 best_val_loss = cumulative_loss
                 torch.save(model.state_dict(), f"./best_model_params/m_{args.model}_{args.representation}_{args.problem_type}_{'and'.join(args.difficulty)}_ld{str(args.latent_dim)}_c{str(args.num_conv_layers)}_{args.different}.pt")
                 torch.save(decoder.state_dict(), f"./best_model_params/d_{args.model}_{args.representation}_{args.problem_type}_{'and'.join(args.difficulty)}_ld{str(args.latent_dim)}_c{str(args.num_conv_layers)}_{args.different}.pt")
+            scheduler.step(cumulative_loss)
+            
     print("Training complete.")
-    print(f"Training BCE Loss - min: {min(train_loss_record):.2f}, max: {max(train_loss_record):.2f}")
-    print(f"Validation Loss - min: {min(val_loss_record):.2f}%, max: {max(val_loss_record):.2f}%")
+    print(f"Training BCE Losses - min: {min(train_loss_record):.2f}, max: {max(train_loss_record):.2f}")
+    print(f"Best validation loss - {best_val_loss/num_validation_instances:.2f}%")
 
 
 if __name__ == "__main__":
