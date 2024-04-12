@@ -125,13 +125,25 @@ def convert_instance_to_VCG_bi_with_meta_node(formula):
     data['clause', 'contains_pos', 'variable'].polarity = torch.ones(len(pos_sources)).float()
     data['clause', 'contains_neg', 'variable'].polarity = -torch.ones(len(neg_sources)).float()
     
-    sources = torch.from_numpy(sources).long()
-    targets = torch.from_numpy(targets).long()
-    edge_index = torch.stack([sources, targets], dim=0)
-    src, trg = edge_index
-    data['meta'].deg = torch.tensor([num_clauses]).long()
-    data['clause'].deg = degree(src) + torch.ones_like(degree(src))
-    data['variable'].deg = degree(trg)
+    pos_edge_index = torch.stack([pos_sources, pos_targets], dim=0)
+    neg_edge_index = torch.stack([neg_sources, neg_targets], dim=0)
+    pos_src, pos_trg = pos_edge_index
+    neg_src, neg_trg = neg_edge_index
+    deg_pos_src = degree(pos_src)
+    deg_neg_src = degree(neg_src)
+    deg_pos_trg = degree(pos_trg)
+    deg_neg_trg = degree(neg_trg)
+    if len(degree(pos_src)) < num_clauses:
+        deg_pos_src = torch.cat([degree(pos_src), torch.from_numpy(np.zeros(num_clauses - len(degree(pos_src)))).float()])
+    if len(degree(neg_src)) < num_clauses:
+        deg_neg_src = torch.cat([degree(neg_src), torch.from_numpy(np.zeros(num_clauses - len(degree(neg_src)))).float()])
+    if len(degree(pos_trg)) < num_variables:
+        deg_pos_trg = torch.cat([degree(pos_trg), torch.from_numpy(np.zeros(num_variables - len(degree(pos_trg)))).float()])
+    if len(degree(neg_trg)) < num_variables:
+        deg_neg_trg = torch.cat([degree(neg_trg), torch.from_numpy(np.zeros(num_variables - len(degree(neg_trg)))).float()])
+    data['meta'].deg = {"connects": torch.tensor([num_clauses]).float()}
+    data['clause'].deg = {"connects": torch.ones(num_clauses).float(), "contains_pos": deg_pos_src, "contains_neg": deg_neg_src}
+    data['variable'].deg = {"contains_pos": deg_pos_trg, "contains_neg": deg_neg_trg}
  
     data = T.ToUndirected()(data)
     return data
@@ -176,12 +188,24 @@ def convert_instance_to_VCG_bi(formula):
     data['clause', 'contains_pos', 'variable'].polarity = torch.ones(len(pos_sources)).float()
     data['clause', 'contains_neg', 'variable'].polarity = -torch.ones(len(neg_sources)).float()
 
-    sources = torch.from_numpy(sources).long()
-    targets = torch.from_numpy(targets).long()
-    edge_index = torch.stack([sources, targets], dim=0)
-    src, trg = edge_index
-    data['clause'].deg = degree(src)
-    data['variable'].deg = degree(trg)
+    pos_edge_index = torch.stack([pos_sources, pos_targets], dim=0)
+    neg_edge_index = torch.stack([neg_sources, neg_targets], dim=0)
+    pos_src, pos_trg = pos_edge_index
+    neg_src, neg_trg = neg_edge_index
+    deg_pos_src = degree(pos_src)
+    deg_neg_src = degree(neg_src)
+    deg_pos_trg = degree(pos_trg)
+    deg_neg_trg = degree(neg_trg)
+    if len(degree(pos_src)) < num_clauses:
+        deg_pos_src = torch.cat([degree(pos_src), torch.from_numpy(np.zeros(num_clauses - len(degree(pos_src)))).float()])
+    if len(degree(neg_src)) < num_clauses:
+        deg_neg_src = torch.cat([degree(neg_src), torch.from_numpy(np.zeros(num_clauses - len(degree(neg_src)))).float()])
+    if len(degree(pos_trg)) < num_variables:
+        deg_pos_trg = torch.cat([degree(pos_trg), torch.from_numpy(np.zeros(num_variables - len(degree(pos_trg)))).float()])
+    if len(degree(neg_trg)) < num_variables:
+        deg_neg_trg = torch.cat([degree(neg_trg), torch.from_numpy(np.zeros(num_variables - len(degree(neg_trg)))).float()])
+    data['clause'].deg = {"contains_pos": deg_pos_src, "contains_neg": deg_neg_src}
+    data['variable'].deg = {"contains_pos": deg_pos_trg, "contains_neg": deg_neg_trg}
  
     data = T.ToUndirected()(data)
     return data
@@ -238,16 +262,15 @@ def convert_instance_to_LCG_with_meta_node(formula, add_self_loops=False):
     data['meta', 'connects', 'clause'].edge_index = torch.stack([torch.zeros(num_clauses).long(), torch.arange(num_clauses).long()], dim=0)
     data['literal', 'paired_with', 'literal'].edge_index = torch.stack([l2l_sources, l2l_targets], dim=0)
 
-    data['meta'].deg = torch.tensor([num_clauses]).long()
-    data['clause'].deg = degree(sources) + torch.ones_like(degree(sources))
+    data['meta'].deg = {"connects": torch.tensor([num_clauses]).float()}
+    data['clause'].deg = {"connects": torch.ones(num_clauses).float(), "contains": degree(sources)}
     # Address the case where the trailing literals do not appear in any clause
-    if len(degree(targets)) < num_literals:
-        data['literal'].deg = torch.cat([degree(targets), torch.from_numpy(np.zeros(num_literals - len(degree(targets)))).long()])
-    elif len(degree(targets)) == num_literals:
-        data['literal'].deg = degree(targets)
-    else:
-        ValueError("Number of literals exceeds number of clauses in LCG graph")
-    data['literal'].deg += degree(l2l_targets)
+    deg_trg = degree(targets)
+    if len(deg_trg) < num_literals:
+        deg_trg = torch.cat([deg_trg, torch.from_numpy(np.zeros(num_literals - len(deg_trg))).float()])
+    elif len(deg_trg) > num_literals:
+        ValueError("Something went wrong with the degree of the literals in LCG graph")
+    data['literal'].deg = {"contains": deg_trg}
     
     data = T.ToUndirected()(data)
     if add_self_loops:
@@ -282,8 +305,6 @@ def convert_instance_to_LCG(formula, add_self_loops=False):
             l2l_sources.append(-variable)
             l2l_targets.append(variable)
 
-
-
     num_literals = len(literals)
     data = HeteroData()
     data.y = torch.tensor([[label]]).float()
@@ -305,15 +326,14 @@ def convert_instance_to_LCG(formula, add_self_loops=False):
     data['clause', 'contains', 'literal'].edge_index = torch.stack([sources, targets], dim=0)
     data['literal', 'paired_with', 'literal'].edge_index = torch.stack([l2l_sources, l2l_targets], dim=0)
     
-    data['clause'].deg = degree(sources)
+    data['clause'].deg = {"contains": degree(sources)}
     # Address the case where the trailing literals do not appear in any clause
-    if len(degree(targets)) < num_literals:
-        data['literal'].deg = torch.cat([degree(targets), torch.from_numpy(np.zeros(num_literals - len(degree(targets)))).long()])
-    elif len(degree(targets)) == num_literals:
-        data['literal'].deg = degree(targets)
-    else:
-        ValueError("Number of literals exceeds number of clauses in LCG graph")
-    data['literal'].deg += degree(l2l_targets)
+    deg_trg = degree(targets)
+    if len(deg_trg) < num_literals:
+        deg_trg = torch.cat([deg_trg, torch.from_numpy(np.zeros(num_literals - len(deg_trg))).float()])
+    elif len(deg_trg) > num_literals:
+        ValueError("Something went wrong with the degree of the literals in LCG graph")
+    data['literal'].deg = {"contains": deg_trg}
 
     data = T.ToUndirected()(data)
     if add_self_loops:

@@ -24,13 +24,13 @@ class G4GCN_LCG(nn.Module):
 
         for _ in range(num_conv_layers):
             conv_dict = {
-                ('clause', 'contains', 'literal'): G4GCNConv(*[hidden_channels]*3),
+                ('clause', 'contains', 'literal'): G4GCNConv(*[hidden_channels]*3, "contains"),
                 # ('literal', 'paired_with', 'literal'): G4GCNConv(*[hidden_channels]*3), #Not used
-                ('literal', 'rev_contains', 'clause'): G4GCNConv(*[hidden_channels]*3),
+                ('literal', 'rev_contains', 'clause'): G4GCNConv(*[hidden_channels]*3, "contains"),
             }
             if self.include_meta_node:
-                conv_dict[('meta', 'connects', 'clause')] = G4GCNConv(*[hidden_channels]*3)
-                conv_dict[('clause', 'rev_connects', 'meta')] = G4GCNConv(*[hidden_channels]*3)
+                conv_dict[('meta', 'connects', 'clause')] = G4GCNConv(*[hidden_channels]*3, "connects")
+                conv_dict[('clause', 'rev_connects', 'meta')] = G4GCNConv(*[hidden_channels]*3, "connects")
                 self.lins_m.append(Linear(hidden_channels*2, hidden_channels))
                 self.lins_c.append(Linear(hidden_channels*3, hidden_channels))
                 self.lins_v.append(Linear(hidden_channels*3, hidden_channels))
@@ -77,14 +77,14 @@ class G4GCN_VCG(nn.Module):
 
         for _ in range(num_conv_layers):
             conv_dict = {
-                ('clause', 'contains_pos', 'variable'): G4GCNConv(*[hidden_channels]*3),
-                ('clause', 'contains_neg', 'variable'): G4GCNConv(*[hidden_channels]*3),
-                ('variable', 'rev_contains_pos', 'clause'): G4GCNConv(*[hidden_channels]*3),
-                ('variable', 'rev_contains_neg', 'clause'): G4GCNConv(*[hidden_channels]*3)
+                ('clause', 'contains_pos', 'variable'): G4GCNConv(*[hidden_channels]*3, 'contains_pos'),
+                ('clause', 'contains_neg', 'variable'): G4GCNConv(*[hidden_channels]*3, 'contains_neg'),
+                ('variable', 'rev_contains_pos', 'clause'): G4GCNConv(*[hidden_channels]*3, 'contains_pos'),
+                ('variable', 'rev_contains_neg', 'clause'): G4GCNConv(*[hidden_channels]*3, 'contains_neg'),
             }
             if self.include_meta_node:
-                conv_dict[('meta', 'connects', 'clause')] = G4GCNConv(*[hidden_channels]*3)
-                conv_dict[('clause', 'rev_connects', 'meta')] = G4GCNConv(*[hidden_channels]*3)
+                conv_dict[('meta', 'connects', 'clause')] = G4GCNConv(*[hidden_channels]*3, 'connects')
+                conv_dict[('clause', 'rev_connects', 'meta')] = G4GCNConv(*[hidden_channels]*3, 'connects')
                 self.lins_m.append(Linear(hidden_channels*2, hidden_channels))
                 self.lins_c.append(Linear(hidden_channels*4, hidden_channels))
                 self.lins_v.append(Linear(hidden_channels*3, hidden_channels))
@@ -115,11 +115,12 @@ class G4GCN_VCG(nn.Module):
 
 class G4GCNConv(MessagePassing):
     # Must manually ensure that models have the same parameters when initialized
-    def __init__(self, src_channels, tgt_channels, out_channels):
+    def __init__(self, src_channels, tgt_channels, out_channels, edge_type):
         super().__init__(aggr='add')  # "Add" aggregation (Step 5).
         self.lin_src = Linear(src_channels, out_channels, bias=True)
         self.lin_src.reset_parameters()
         self.MLP = MLP([out_channels, out_channels, out_channels])
+        self.edge_type = edge_type
 
     def forward(self, x, deg, edge_index):
         # Linearly transform node feature matrix.
@@ -129,6 +130,8 @@ class G4GCNConv(MessagePassing):
         # Compute normalization.
         src, trg = edge_index
         deg_src, deg_trg = deg
+        deg_src = deg_src[self.edge_type]
+        deg_trg = deg_trg[self.edge_type]
         deg_src_inv_sqrt = deg_src.pow(-0.5)
         deg_src_inv_sqrt[deg_src_inv_sqrt == float('inf')] = 0
         deg_trg_inv_sqrt = deg_trg.pow(-0.5)
