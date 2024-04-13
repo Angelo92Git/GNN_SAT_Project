@@ -17,7 +17,7 @@ import models as m
 def main():
     parser = argparse.ArgumentParser(description="Train model and save best parameters.")
     parser.add_argument("-d", "--difficulty", type=str, choices=["easy", "medium", "hard"], required=True, nargs='+', help="easy, medium, or hard, (combinations may also be provided)")
-    parser.add_argument("-p", "--problem_type", type=str, required=True, help="3-sat, or sr",)
+    parser.add_argument("-p", "--problem_type", type=str, required=True, nargs='+', help="3-sat, or sr")
     parser.add_argument("-r", "--representation", type=str, choices=["VCGm", "VCG", "LCGm", "LCG"], required=True, help="VCGm, VCG, LCGm, or LCG")
     parser.add_argument("-m", "--model", type=str, choices=["GCN"], required=True, help="GCN")
     parser.add_argument("-b", "--batch_size", type=int, required=False, default=2, help="batch size for training")
@@ -36,8 +36,13 @@ def main():
         train_difficulty_levels = [args.difficulty]
         val_difficulty_levels = [args.difficulty]
 
-    train_problem_types = [args.problem_type]
-    val_problem_types = [args.problem_type]
+    if type(args.problem_type) == list:
+        train_problem_types = args.problem_type
+        val_problem_types = args.problem_type
+    else:
+        train_problem_types = [args.problem_type]
+        val_problem_types = [args.problem_type]
+
     train_splits = ["train"]
     val_splits = ["valid"]
     satisfiability = ["sat", "unsat"]
