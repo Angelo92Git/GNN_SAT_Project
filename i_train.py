@@ -126,7 +126,7 @@ def main():
                 best_val_loss = cumulative_loss
                 torch.save(model.state_dict(), f"./best_model_params/m_{args.model}_{args.representation}_{args.problem_type}_{'and'.join(args.difficulty)}_ld{str(args.latent_dim)}_c{str(args.num_conv_layers)}_{args.different}.pt")
                 torch.save(decoder.state_dict(), f"./best_model_params/d_{args.model}_{args.representation}_{args.problem_type}_{'and'.join(args.difficulty)}_ld{str(args.latent_dim)}_c{str(args.num_conv_layers)}_{args.different}.pt")
-            scheduler.step(cumulative_loss)
+        scheduler.step(cumulative_loss)
             
     print("Training complete.")
     print(f"Training BCE Losses - min: {min(train_loss_record):.2f}, max: {max(train_loss_record):.2f}")
