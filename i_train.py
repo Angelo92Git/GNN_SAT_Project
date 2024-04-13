@@ -63,7 +63,7 @@ def main():
     print(f"Number of training instances: {num_training_instances}")
     print(f"Number of validation instances: {num_validation_instances}")
     train_loader = DataLoader(training_dataset, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=False)
+    val_loader = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
