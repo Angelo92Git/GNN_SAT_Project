@@ -94,6 +94,7 @@ def main():
 
     # Train model
     train_loss_record = []
+    cumulative_val_loss_record = []
     best_val_loss = np.inf
     pbar = trange(args.epochs, desc="Epoch")
     for epoch in pbar:
@@ -125,6 +126,7 @@ def main():
                 predictions = np.concatenate([predictions, torch.round(out).T.cpu().numpy()[0]], 0)
                 labels = np.concatenate([labels, batched_data.y.T.cpu().numpy()[0]], 0)
                 cumulative_loss += val_loss.item()
+            cumulative_val_loss_record.append(cumulative_loss)
             if cumulative_loss < best_val_loss:
                 best_predictions = predictions
                 best_labels = labels
@@ -132,7 +134,9 @@ def main():
                 torch.save(model.state_dict(), f"./best_model_params/m_{args.model}_{args.representation}_{args.problem_type}_{'and'.join(args.difficulty)}_ld{str(args.latent_dim)}_c{str(args.num_conv_layers)}_{args.different}.pt")
                 torch.save(decoder.state_dict(), f"./best_model_params/d_{args.model}_{args.representation}_{args.problem_type}_{'and'.join(args.difficulty)}_ld{str(args.latent_dim)}_c{str(args.num_conv_layers)}_{args.different}.pt")
         scheduler.step(cumulative_loss)
-            
+    
+    np.savetxt(f"train_loss_record",np.array(train_loss_record))
+    np.savetxt("cumulative_val_loss_record",np.array(cumulative_val_loss_record))
     print("Training complete.")
     print(f"Training BCE Losses - min: {min(train_loss_record):.2f}, max: {max(train_loss_record):.2f}")
     accuracy = np.sum(best_predictions == best_labels) / num_validation_instances

@@ -113,7 +113,9 @@ def main():
         results["precision"].append(precision)
         results["recall"].append(recall)
         results["f1"].append(f1)
-    
+
+    np.savetxt("test_predictions.txt", predictions)
+    np.savetxt("test_labels.txt", labels) 
     results_pd = pd.DataFrame.from_dict(results)
     results_pd = results_pd.astype("str")
     results_pd.fillna("nan", inplace=True)
