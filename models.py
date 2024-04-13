@@ -85,12 +85,12 @@ class G4GCN_VCG(nn.Module):
             if self.include_meta_node:
                 conv_dict[('meta', 'connects', 'clause')] = G4GCNConv(*[hidden_channels]*3, 'connects')
                 conv_dict[('clause', 'rev_connects', 'meta')] = G4GCNConv(*[hidden_channels]*3, 'connects')
-                self.lins_m.append(Linear(hidden_channels*2, hidden_channels))
-                self.lins_c.append(Linear(hidden_channels*4, hidden_channels))
-                self.lins_v.append(Linear(hidden_channels*3, hidden_channels))
+                self.lins_m.append(Linear(hidden_channels*2, hidden_channels, bias=False))
+                self.lins_c.append(Linear(hidden_channels*4, hidden_channels, bias=False))
+                self.lins_v.append(Linear(hidden_channels*3, hidden_channels, bias=False))
             else:
-                self.lins_c.append(Linear(hidden_channels*3, hidden_channels))
-                self.lins_v.append(Linear(hidden_channels*3, hidden_channels))
+                self.lins_c.append(Linear(hidden_channels*3, hidden_channels, bias=False))
+                self.lins_v.append(Linear(hidden_channels*3, hidden_channels, bias=False))
 
             conv = HeteroConv(conv_dict, aggr='cat')
             self.convs.append(conv)
@@ -117,16 +117,12 @@ class G4GCNConv(MessagePassing):
     # Must manually ensure that models have the same parameters when initialized
     def __init__(self, src_channels, tgt_channels, out_channels, edge_type):
         super().__init__(aggr='add')  # "Add" aggregation (Step 5).
-        self.lin_src = Linear(src_channels, out_channels, bias=True)
-        self.lin_src.reset_parameters()
-        self.MLP = MLP([out_channels, out_channels, out_channels])
+        self.MLP = MLP([src_channels, out_channels, out_channels])
         self.edge_type = edge_type
 
     def forward(self, x, deg, edge_index):
-        # Linearly transform node feature matrix.
         x_src, x_trg = x
-        x_src = self.lin_src(x_src).relu()
-
+        size = (x_src.size(0), x_trg.size(0))
         # Compute normalization.
         src, trg = edge_index
         deg_src, deg_trg = deg
@@ -139,7 +135,7 @@ class G4GCNConv(MessagePassing):
         norm = deg_src_inv_sqrt[src] * deg_trg_inv_sqrt[trg]
 
         # Start propagating messages.
-        out = self.propagate(edge_index, x=x, norm=norm)
+        out = self.propagate(edge_index, size=size, x=x, norm=norm)
         return out
 
     def message(self, x_i, x_j, norm):
@@ -160,7 +156,10 @@ class MLP(nn.Module):
         self.layer_sizes = layer_sizes
         layers = []
         for layer, layer_size in enumerate(layer_sizes[:-1]):
-            layers.append(Linear(layer_sizes[layer], layer_sizes[layer+1], bias=True))
+            if layer_sizes[layer+1] == 1:
+                layers.append(Linear(layer_sizes[layer], layer_sizes[layer+1], bias=False))
+            else:
+                layers.append(Linear(layer_sizes[layer], layer_sizes[layer+1], bias=True))
             if layer != len(layer_sizes[:-1]) - 1:
                 layers.append(nn.ReLU())
         self.linear_layers = nn.Sequential(*layers)
