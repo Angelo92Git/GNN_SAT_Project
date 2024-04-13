@@ -89,7 +89,6 @@ def main():
 
     # Train model
     train_loss_record = []
-    val_loss_record = []
     best_val_loss = np.inf
     pbar = trange(args.epochs, desc="Epoch")
     for epoch in pbar:
@@ -108,6 +107,7 @@ def main():
                 train_loss_record.append(train_loss.item())
 
         model.eval()
+        cumulative_loss = 0
         predictions = []
         labels = []
         with torch.no_grad():
@@ -119,9 +119,10 @@ def main():
                 val_loss = BCELoss()(out, batched_data.y)
                 predictions = np.concatenate([predictions, torch.round(out).T.cpu().numpy()[0]], 0)
                 labels = np.concatenate([labels, batched_data.y.T.cpu().numpy()[0]], 0)
-                val_loss_record.append(val_loss.item())
-            cumulative_loss = sum(val_loss_record)
+                cumulative_loss += val_loss.item()
             if cumulative_loss < best_val_loss:
+                best_predictions = predictions
+                best_labels = labels
                 best_val_loss = cumulative_loss
                 torch.save(model.state_dict(), f"./best_model_params/m_{args.model}_{args.representation}_{args.problem_type}_{'and'.join(args.difficulty)}_ld{str(args.latent_dim)}_c{str(args.num_conv_layers)}_{args.different}.pt")
                 torch.save(decoder.state_dict(), f"./best_model_params/d_{args.model}_{args.representation}_{args.problem_type}_{'and'.join(args.difficulty)}_ld{str(args.latent_dim)}_c{str(args.num_conv_layers)}_{args.different}.pt")
@@ -129,7 +130,7 @@ def main():
             
     print("Training complete.")
     print(f"Training BCE Losses - min: {min(train_loss_record):.2f}, max: {max(train_loss_record):.2f}")
-    accuracy = np.sum(predictions == labels) / num_validation_instances
+    accuracy = np.sum(best_predictions == best_labels) / num_validation_instances
     print(f"Best validation accuracy - {accuracy*100:.2f}%")
 
 
