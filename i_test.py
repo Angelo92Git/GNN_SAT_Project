@@ -50,12 +50,16 @@ def main():
         testing_formulas = F.read_instances_from_paths(paths_to_testing_instances)
         if "VCGm" in test_model_param:
             testing_dataset = [f2g.convert_instance_to_VCG_bi_with_meta_node(formula) for formula in testing_formulas]
+            include_meta_node = True
         elif "VCG" in test_model_param:
             testing_dataset = [f2g.convert_instance_to_VCG_bi(formula) for formula in testing_formulas]
+            include_meta_node = False
         elif "LCGm" in test_model_param:
             testing_dataset = [f2g.convert_instance_to_LCG_with_meta_node(formula) for formula in testing_formulas]
+            include_meta_node = True
         elif "LCG" in test_model_param:
             testing_dataset = [f2g.convert_instance_to_LCG(formula) for formula in testing_formulas]
+            include_meta_node = False
         else:
             KeyError(f"Model representation {test_model_param} not recognized.")
 
@@ -69,10 +73,10 @@ def main():
         # Initialize model
         params = test_model_param.split("_")
         param_dict = {"model": params[0], "representation": params[1], "latent_dim": int(params[4][2:]), "num_conv_layers": int(params[5][1:])}
-        models_available = {"GCN": {"VCG":m.G4GCN_VCG, "LCG":m.G4GCN_LCG}}
+        models_available = {"GCN": {"VCG":m.G4GCN_VCG, "LCG":m.G4GCN_LCG, "VCG":m.G4GCN_VCG, "LCG":m.G4GCN_LCG}}
         hidden_channels = param_dict["latent_dim"]
         num_conv_layers = param_dict["num_conv_layers"]
-        model = models_available[param_dict["model"]][param_dict["representation"]](hidden_channels=hidden_channels, num_conv_layers=num_conv_layers)
+        model = models_available[param_dict["model"]][param_dict["representation"]](hidden_channels=hidden_channels, num_conv_layers=num_conv_layers, include_meta_node=include_meta_node)
         decoder = m.MLP([hidden_channels, hidden_channels, 1])
         
         # Load model

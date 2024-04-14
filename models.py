@@ -48,7 +48,7 @@ class G4GCN_LCG(nn.Module):
         x_dict['literal'] = self.lin0_v(x_dict['literal'])
         literala, literalb = edge_index_dict['literal', 'paired_with', 'literal']
         literal_pair_lookup = {literala.item(): literalb.item() for literala, literalb in zip(literala, literalb)}
-        literal_pair_map = np.array([literal_pair_lookup[literal_idx] for literal_idx in range(deg_dict['literal'].shape[0])])
+        literal_pair_map = np.array([literal_pair_lookup[literal_idx] for literal_idx in range(x_dict['literal'].shape[0])])
         for conv_layer, conv in enumerate(self.convs):
             x_dict_prev = x_dict
             x_dict = conv(x_dict, deg_dict, edge_index_dict)
