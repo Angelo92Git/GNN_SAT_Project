@@ -77,9 +77,11 @@ def main():
     if args.representation in ["VCGm", "VCG"]:
         model_choices = {"GCN": m.G4GCN_VCG}
         label_key = "variable"
+        out_factor = 1
     elif args.representation in ["LCGm", "LCG"]:
         model_choices = {"GCN": m.G4GCN_LCG}
         label_key = "literal"
+        out_factor = 2
 
     if args.representation in ["VCGm", "LCGm"]:
         include_meta_node = True
@@ -87,7 +89,7 @@ def main():
         include_meta_node = False
 
     model = model_choices[args.model](hidden_channels=hidden_channels, num_conv_layers=args.num_conv_layers, include_meta_node=include_meta_node)
-    decoder = m.MLP([hidden_channels, hidden_channels, 1])
+    decoder = m.MLP([hidden_channels*out_factor, hidden_channels*out_factor, 1])
     model.to(device)
     decoder.to(device)
     model_params = list(model.parameters()) + list(decoder.parameters())

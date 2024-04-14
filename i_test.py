@@ -52,18 +52,22 @@ def main():
             testing_dataset = [f2g.convert_instance_to_VCG_bi_with_meta_node(formula) for formula in testing_formulas]
             include_meta_node = True
             label_key = "variable"
+            out_factor = 1
         elif "VCG" in test_model_param:
             testing_dataset = [f2g.convert_instance_to_VCG_bi(formula) for formula in testing_formulas]
             include_meta_node = False
             label_key = "variable"
+            out_factor = 1
         elif "LCGm" in test_model_param:
             testing_dataset = [f2g.convert_instance_to_LCG_with_meta_node(formula) for formula in testing_formulas]
             include_meta_node = True
             label_key = "literal"
+            out_factor = 2
         elif "LCG" in test_model_param:
             testing_dataset = [f2g.convert_instance_to_LCG(formula) for formula in testing_formulas]
             include_meta_node = False
             label_key = "literal"
+            out_factor = 2
         else:
             KeyError(f"Model representation {test_model_param} not recognized.")
 
@@ -81,7 +85,7 @@ def main():
         hidden_channels = param_dict["latent_dim"]
         num_conv_layers = param_dict["num_conv_layers"]
         model = models_available[param_dict["model"]][param_dict["representation"]](hidden_channels=hidden_channels, num_conv_layers=num_conv_layers, include_meta_node=include_meta_node)
-        decoder = m.MLP([hidden_channels, hidden_channels, 1])
+        decoder = m.MLP([hidden_channels*out_factor, hidden_channels*out_factor, 1])
         
         # Load model
         model_path = f"./best_model_params/m_{test_model_param}.pt"
