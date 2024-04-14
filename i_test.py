@@ -51,15 +51,19 @@ def main():
         if "VCGm" in test_model_param:
             testing_dataset = [f2g.convert_instance_to_VCG_bi_with_meta_node(formula) for formula in testing_formulas]
             include_meta_node = True
+            label_key = "variable"
         elif "VCG" in test_model_param:
             testing_dataset = [f2g.convert_instance_to_VCG_bi(formula) for formula in testing_formulas]
             include_meta_node = False
+            label_key = "variable"
         elif "LCGm" in test_model_param:
             testing_dataset = [f2g.convert_instance_to_LCG_with_meta_node(formula) for formula in testing_formulas]
             include_meta_node = True
+            label_key = "literal"
         elif "LCG" in test_model_param:
             testing_dataset = [f2g.convert_instance_to_LCG(formula) for formula in testing_formulas]
             include_meta_node = False
+            label_key = "literal"
         else:
             KeyError(f"Model representation {test_model_param} not recognized.")
 

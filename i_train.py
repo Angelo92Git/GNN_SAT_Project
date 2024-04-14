@@ -76,8 +76,10 @@ def main():
     hidden_channels = args.latent_dim
     if args.representation in ["VCGm", "VCG"]:
         model_choices = {"GCN": m.G4GCN_VCG}
+        label_key = "variable"
     elif args.representation in ["LCGm", "LCG"]:
         model_choices = {"GCN": m.G4GCN_LCG}
+        label_key = "literal"
 
     if args.representation in ["VCGm", "LCGm"]:
         include_meta_node = True
@@ -103,7 +105,7 @@ def main():
             batched_data = batched_data.to(device)
             optimizer.zero_grad()
             out = model(batched_data.x_dict, batched_data.deg_dict , batched_data.edge_index_dict)
-            out = scatter_mean(out, batched_data["variable"]["batch"], dim=0)
+            out = scatter_mean(out, batched_data[label_key]["batch"], dim=0)
             out = decoder(out).sigmoid()
             train_loss = BCELoss()(out, batched_data.y)
             train_loss.backward()
@@ -120,7 +122,7 @@ def main():
             for batched_data in val_loader:
                 batched_data = batched_data.to(device)
                 out = model(batched_data.x_dict, batched_data.deg_dict , batched_data.edge_index_dict)
-                out = scatter_mean(out, batched_data["variable"]["batch"], dim=0)
+                out = scatter_mean(out, batched_data[label_key]["batch"], dim=0)
                 out = decoder(out).sigmoid()
                 val_loss = BCELoss()(out, batched_data.y)
                 predictions = np.concatenate([predictions, torch.round(out).T.cpu().numpy()[0]], 0)
