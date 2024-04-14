@@ -99,7 +99,7 @@ def main():
             for batched_data in test_loader:
                 batched_data = batched_data.to(device)
                 out = model(batched_data.x_dict, batched_data.deg_dict, batched_data.edge_index_dict)
-                out = scatter_mean(out, batched_data["variable"]["batch"], dim=0)
+                out = scatter_mean(out, batched_data[label_key]["batch"], dim=0)
                 out = decoder(out).sigmoid()
                 labels = np.concatenate([labels, batched_data.y.T.cpu().numpy()[0]], 0)
                 predictions = np.concatenate([predictions, torch.round(out).T.cpu().numpy()[0]], 0)
