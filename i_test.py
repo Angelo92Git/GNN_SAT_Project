@@ -81,7 +81,7 @@ def main():
         # Initialize model
         params = test_model_param.split("_")
         param_dict = {"model": params[0], "representation": params[1], "latent_dim": int(params[4][2:]), "num_conv_layers": int(params[5][1:])}
-        models_available = {"GCN": {"VCG":m.G4GCN_VCG, "LCG":m.G4GCN_LCG, "VCG":m.G4GCN_VCG, "LCG":m.G4GCN_LCG}}
+        models_available = {"GCN": {"VCG":m.G4GCN_VCG, "LCG":m.G4GCN_LCG, "VCGm":m.G4GCN_VCG, "LCGm":m.G4GCN_LCG}}
         hidden_channels = param_dict["latent_dim"]
         num_conv_layers = param_dict["num_conv_layers"]
         model = models_available[param_dict["model"]][param_dict["representation"]](hidden_channels=hidden_channels, num_conv_layers=num_conv_layers, include_meta_node=include_meta_node)
