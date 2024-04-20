@@ -6,7 +6,7 @@ https://arxiv.org/abs/2309.16941
 - ```./my_utils/graph_utils.py``` contains custom graph utility functions to convert Boolean formulas into the graph representations VCG, LCG, VCGm, and LCGm, as well as plotting functions
 - ```./models.py``` contains the custom GCN message-passing implementation for heterogeneous graphs for each representation in VCG, LCG, VCGm, and LCGm
 - ```i_train.py``` is a scipt that takes in command line arguments to train the model, type in ```python i_train.py -h``` at the terminal to see usage
-- ```i_test.py``` is a script that takes in command line arguments to test the trained models, type in ```python i_test.py``` at the terminal to see usage
+- ```i_test.py``` is a script that takes in command line arguments to test the trained models, type in ```python i_test.py -h``` at the terminal to see usage
 
 # Dependencies
 The following can be run in a Colab cell to execute the scripts
