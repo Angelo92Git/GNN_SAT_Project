@@ -1,3 +1,6 @@
+This project seeks to reproduce and extend some the analysis in G4SATBench
+https://arxiv.org/abs/2309.16941
+
 # Project Files
 - ```./my_utils/formula_utils.py``` contains custom utility functions to parse CNF data in DIMACs text files and manipulate Boolean formulas
 - ```./my_utils/graph_utils.py``` contains custom graph utility functions to convert Boolean formulas into the graph representations VCG, LCG, VCGm, and LCGm, as well as plotting functions
